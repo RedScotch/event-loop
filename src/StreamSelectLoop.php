@@ -31,6 +31,61 @@ class StreamSelectLoop implements LoopInterface
         $this->timers = new Timers();
     }
 
+    private $readSockets = [];
+    private $readSocketListeners = [];
+    private $writeSockets = [];
+    private $writeSocketListeners = [];
+    public function addSocketRead($socket,callable $listener){
+        if(is_resource($socket)){
+            $key = (int)$socket;
+            $this->readSockets[$key] = $socket;
+            $this->readSocketListeners[$key] = $listener;
+        }
+    }
+
+    public function addSocketWrite($socket,callable $listener){
+        if(is_resource($socket)){
+            $key = (int)$socket;
+            $this->writeSockets[$key] = $socket;
+            $this->writeSocketListeners[$key] = $listener;
+        }
+    }
+
+    public function socketTick(){
+        if(!empty($this->readSockets) || !empty($this->writeSockets)){
+            $reads = $this->readSockets;
+            $writes = $this->writeSockets;
+            $x = [];
+            socket_select($reads,$writes,$x,0);
+            if(!empty($reads)){
+                foreach($reads as $s){
+                    $key = (int)$s;
+                    $call = $this->readSocketListeners[$key];
+                    $call();
+                }
+            }
+
+            if(!empty($writes)){
+                foreach($writes as $s){
+                    $key = (int)$s;
+                    $call = $this->writeSocketListeners[$key];
+                    $call();
+                }
+            }
+        }
+    }
+
+    public function removeSocket($socket){
+        if(is_resource($socket)){
+            $key = (int)$socket;
+            unset($this->readSockets[$key]);
+            unset($this->writeSockets[$key]);
+            unset($this->readSocketListeners[$key]);
+            unset($this->writeSocketListeners[$key]);
+        }
+    }
+
+
     /**
      * {@inheritdoc}
      */
@@ -198,6 +253,7 @@ class StreamSelectLoop implements LoopInterface
                 break;
             }
 
+            $this->socketTick();
             $this->waitForStreamActivity($timeout);
         }
     }
