@@ -38,7 +38,87 @@ class LibEventLoop implements LoopInterface
 
         $this->createTimerCallback();
         $this->createStreamCallback();
+        $this->addPeriodicTimer(0.016,function(){
+            $this->socketTick();
+        });
     }
+
+    //Socket wrappers
+    private $readSockets = [];
+    private $readSocketListeners = [];
+    private $writeSockets = [];
+    private $writeSocketListeners = [];
+    public function addReadSocket($socket,callable $listener){
+        if(is_resource($socket)){
+            $key = (int)$socket;
+            $this->readSockets[$key] = $socket;
+            $this->readSocketListeners[$key] = $listener;
+        }
+    }
+
+    public function addWriteSocket($socket,callable $listener){
+        if(is_resource($socket)){
+            $key = (int)$socket;
+            if(!isset($this->writeSocketListeners[$key])){
+                $this->writeSockets[$key] = $socket;
+                $this->writeSocketListeners[$key] = $listener;
+            }
+        }
+    }
+
+    public function socketTick(){
+        if(!empty($this->readSockets) || !empty($this->writeSockets)){
+            $reads = $this->readSockets;
+            $writes = $this->writeSockets;
+            $x = [];
+            socket_select($reads,$writes,$x,0);
+            if(!empty($writes)){
+                foreach($writes as $s){
+                    $key = (int)$s;
+                    if(isset($this->writeSocketListeners[$key])){
+                        $call = $this->writeSocketListeners[$key];
+                        $call();
+                    }
+                }
+            }
+
+            if(!empty($reads)){
+                foreach($reads as $s){
+                    $key = (int)$s;
+                    if(isset($this->readSocketListeners[$key])){
+                        $call = $this->readSocketListeners[$key];
+                        $call();
+                    }
+                }
+            }
+        }
+    }
+
+    public function removeSocket($socket){
+        if(is_resource($socket)){
+            $key = (int)$socket;
+            unset($this->readSockets[$key]);
+            unset($this->writeSockets[$key]);
+            unset($this->readSocketListeners[$key]);
+            unset($this->writeSocketListeners[$key]);
+            return true;
+        }
+    }
+
+
+//    public function addReadSocket($socket,callable $listener){
+//        $this->addReadStream($socket,$listener);
+//    }
+//
+//    public function addWriteSocket($socket, callable $listener){
+//        $this->addWriteStream($socket,$listener);
+//    }
+//
+//    public function removeSocket($socket){
+//        $this->removeStream($socket);
+//        return true;
+//    }
+
 
     /**
      * {@inheritdoc}
@@ -243,6 +323,8 @@ class LibEventLoop implements LoopInterface
     private function subscribeStreamEvent($stream, $flag)
     {
         $key = (int) $stream;
+
+        var_dump($stream);
 
         if (isset($this->streamEvents[$key])) {
             $event = $this->streamEvents[$key];

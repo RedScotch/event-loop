@@ -31,13 +31,17 @@ class StreamSelectLoop implements LoopInterface
         $this->nextTickQueue = new NextTickQueue($this);
         $this->futureTickQueue = new FutureTickQueue($this);
         $this->timers = new Timers();
+        $this->addPeriodicTimer(0.016,function(){
+            $this->socketTick();
+        });
     }
 
+    //Socket wrappers
     private $readSockets = [];
     private $readSocketListeners = [];
     private $writeSockets = [];
     private $writeSocketListeners = [];
-    public function addSocketRead($socket,callable $listener){
+    public function addReadSocket($socket,callable $listener){
         if(is_resource($socket)){
             $key = (int)$socket;
             $this->readSockets[$key] = $socket;
@@ -45,15 +49,12 @@ class StreamSelectLoop implements LoopInterface
         }
     }
 
-    public function addSocketWrite($socket,callable $listener){
+    public function addWriteSocket($socket,callable $listener){
         if(is_resource($socket)){
             $key = (int)$socket;
             if(!isset($this->writeSocketListeners[$key])){
                 $this->writeSockets[$key] = $socket;
                 $this->writeSocketListeners[$key] = $listener;
-            }
-            else{
-
             }
         }
     }
@@ -63,16 +64,12 @@ class StreamSelectLoop implements LoopInterface
             $reads = $this->readSockets;
             $writes = $this->writeSockets;
             $x = [];
-            echo time().' :BEFORE'.PHP_EOL;
-            socket_select($reads,$writes,$x,0,0);
-            echo time().' :AFTER'.PHP_EOL;
+            socket_select($reads,$writes,$x,0);
             if(!empty($writes)){
                 foreach($writes as $s){
                     $key = (int)$s;
                     if(isset($this->writeSocketListeners[$key])){
                         $call = $this->writeSocketListeners[$key];
-                        unset($this->writeSocketListeners[$key]);
-                        unset($this->writeSockets[$key]);
                         $call();
                     }
                 }
@@ -229,10 +226,7 @@ class StreamSelectLoop implements LoopInterface
         $this->futureTickQueue->tick();
 
         $this->timers->tick();
-
-        //usleep(0);
-        //$this->waitForStreamActivity(0);
-        $this->waitForSocketActivity(0.01);
+        $this->waitForStreamActivity(0);
     }
 
     /**
@@ -251,13 +245,13 @@ class StreamSelectLoop implements LoopInterface
 
             // Next-tick or future-tick queues have pending callbacks ...
             if (!$this->running || !$this->nextTickQueue->isEmpty() || !$this->futureTickQueue->isEmpty()) {
-                $timeout = 0.01;
+                $timeout = 0;
 
             // There is a pending timer, only block until it is due ...
             } elseif ($scheduledAt = $this->timers->getFirst()) {
                 $timeout = $scheduledAt - $this->timers->getTime();
-                if ($timeout < 0.01) {
-                    $timeout = 0.01;
+                if ($timeout < 0) {
+                    $timeout = 0;
                 } else {
                     $timeout *= self::MICROSECONDS_PER_SECOND;
                 }
@@ -271,14 +265,7 @@ class StreamSelectLoop implements LoopInterface
                 break;
             }
 
-
-//            $this->socketTick();
-//            echo $timeout.PHP_EOL;
-//            usleep(0);
-
-            $this->waitForSocketActivity($timeout);
-
-            //$this->waitForStreamActivity($timeout);
+            $this->waitForStreamActivity($timeout);
         }
     }
 
@@ -318,30 +305,6 @@ class StreamSelectLoop implements LoopInterface
     }
 
 
-    private function waitForSocketActivity($timeout)
-    {
-        $read  = $this->readSockets;
-        $write = $this->writeSockets;
-
-        $this->socketSelect($read, $write, $timeout);
-
-        foreach ($read as $stream) {
-            $key = (int) $stream;
-
-            if (isset($this->readSocketListeners[$key])) {
-                call_user_func($this->readSocketListeners[$key], $stream, $this);
-            }
-        }
-
-        foreach ($write as $stream) {
-            $key = (int) $stream;
-
-            if (isset($this->writeSocketListeners[$key])) {
-                call_user_func($this->writeSocketListeners[$key], $stream, $this);
-            }
-        }
-    }
-
     /**
      * Emulate a stream_select() implementation that does not break when passed
      * empty stream arrays.
@@ -358,19 +321,6 @@ class StreamSelectLoop implements LoopInterface
             $except = null;
 
             return stream_select($read, $write, $except, $timeout === null ? null : 0, $timeout);
-        }
-
-        usleep($timeout);
-
-        return 0;
-    }
-
-    protected function socketSelect(array &$read, array &$write, $timeout)
-    {
-        if ($read || $write) {
-            $except = null;
-
-            return socket_select($read, $write, $except, $timeout === null ? null : 0.01, $timeout);
         }
 
         usleep($timeout);
