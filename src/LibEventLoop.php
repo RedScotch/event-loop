@@ -324,8 +324,6 @@ class LibEventLoop implements LoopInterface
     {
         $key = (int) $stream;
 
-        var_dump($stream);
-
         if (isset($this->streamEvents[$key])) {
             $event = $this->streamEvents[$key];
             $flags = $this->streamFlags[$key] |= $flag;
