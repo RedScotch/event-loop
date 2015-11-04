@@ -28,6 +28,7 @@ class StreamSelectLoop implements LoopInterface
 
     public function __construct()
     {
+        echo 'USING STREAMSELECTLOOP'.PHP_EOL;
         $this->nextTickQueue = new NextTickQueue($this);
         $this->futureTickQueue = new FutureTickQueue($this);
         $this->timers = new Timers();

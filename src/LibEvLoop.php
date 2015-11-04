@@ -27,6 +27,7 @@ class LibEvLoop implements LoopInterface
 
     public function __construct()
     {
+        echo 'USING LIBEVLOOP'.PHP_EOL;
         $this->loop = new EventLoop();
         $this->nextTickQueue = new NextTickQueue($this);
         $this->futureTickQueue = new FutureTickQueue($this);

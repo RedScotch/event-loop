@@ -30,6 +30,7 @@ class ExtEventLoop implements LoopInterface
 
     public function __construct(EventBaseConfig $config = null)
     {
+        echo 'USING EXTEVENTLOOP'.PHP_EOL;
         $this->eventBase = new EventBase($config);
         $this->nextTickQueue = new NextTickQueue($this);
         $this->futureTickQueue = new FutureTickQueue($this);

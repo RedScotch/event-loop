@@ -31,6 +31,7 @@ class LibEventLoop implements LoopInterface
 
     public function __construct()
     {
+        echo 'USING LIBEVENTLOOP'.PHP_EOL;
         $this->eventBase = event_base_new();
         $this->nextTickQueue = new NextTickQueue($this);
         $this->futureTickQueue = new FutureTickQueue($this);
