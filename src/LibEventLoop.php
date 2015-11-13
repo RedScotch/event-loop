@@ -29,6 +29,7 @@ class LibEventLoop implements LoopInterface
     private $readListeners = [];
     private $writeListeners = [];
     private $running;
+    private $nextPoll = 0.016;
 
     public function __construct()
     {
@@ -40,12 +41,38 @@ class LibEventLoop implements LoopInterface
 
         $this->createTimerCallback();
         $this->createStreamCallback();
-        $this->addPeriodicTimer(0.016,function(){
+        $this->addTimer($this->nextPoll,function(){
             $this->socketTick();
         });
-        $this->addPeriodicTimer(15,function(){
+        $this->addPeriodicTimer(5,function(){
             KUBE::Log([count($this->readSockets).":".count($this->readSocketListeners),count($this->writeSockets).":".count($this->writeSocketListeners)],'sockets');
+            $this->adjustNextPoll();
+            gc_collect_cycles();
         });
+    }
+
+    function adjustNextPoll(){
+        if(count($this->readSockets) < 50){
+            $this->nextPoll = 0.016;
+        }
+        elseif(count($this->readSockets) < 100){
+            $this->nextPoll = 0.05;
+        }
+        elseif(count($this->readSockets) < 150){
+            $this->nextPoll = 0.1;
+        }
+        elseif(count($this->readSockets) < 175){
+            $this->nextPoll = 0.25;
+        }
+        elseif(count($this->readSockets) < 200){
+            $this->nextPoll = 0.5;
+        }
+        elseif(count($this->readSockets) < 225){
+            $this->nextPoll = 0.75;
+        }
+        else{
+            $this->nextPoll = 1;
+        }
     }
 
     //Socket wrappers
@@ -97,6 +124,11 @@ class LibEventLoop implements LoopInterface
                 }
             }
         }
+
+        $this->adjustNextPoll();
+        $this->addTimer($this->nextPoll,function(){
+            $this->socketTick();
+        });
     }
 
     public function removeSocket($socket){
