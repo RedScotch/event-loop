@@ -4,6 +4,7 @@ namespace React\EventLoop;
 
 use Event;
 use EventBase;
+use KUBE\KUBE;
 use React\EventLoop\Tick\FutureTickQueue;
 use React\EventLoop\Tick\NextTickQueue;
 use React\EventLoop\Timer\Timer;
@@ -41,6 +42,9 @@ class LibEventLoop implements LoopInterface
         $this->createStreamCallback();
         $this->addPeriodicTimer(0.016,function(){
             $this->socketTick();
+        });
+        $this->addPeriodicTimer(15,function(){
+            KUBE::Log([count($this->readSockets).":".count($this->readSocketListeners),count($this->writeSockets).":".count($this->writeSocketListeners)],'sockets');
         });
     }
 
