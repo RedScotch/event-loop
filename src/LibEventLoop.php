@@ -45,7 +45,7 @@ class LibEventLoop implements LoopInterface
             $this->socketTick();
         });
         $this->addPeriodicTimer(5,function(){
-            KUBE::Log([count($this->readSockets).":".count($this->readSocketListeners),count($this->writeSockets).":".count($this->writeSocketListeners)],'sockets');
+            //KUBE::Log([count($this->readSockets).":".count($this->readSocketListeners),count($this->writeSockets).":".count($this->writeSocketListeners)],'sockets');
             $this->adjustNextPoll();
             gc_collect_cycles();
         });
